@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Balss skulptūra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Karla:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bone:#F3EEE4;
+    --bone-deep:#E9E1D2;
+    --stone:#D9CDB6;
+    --ink:#3E362C;
+    --ink-soft:#8A7E6C;
+    --bronze:#9A7B4F;
+    --bronze-deep:#7E6238;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'Karla',system-ui,sans-serif;
+    background:
+      radial-gradient(120% 90% at 50% 0%, var(--bone) 55%, var(--bone-deep) 100%);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:430px;
+    text-align:center;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.34em;
+    text-transform:uppercase;
+    color:var(--bronze);
+    margin-bottom:14px;
+  }
+  h1{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:600;
+    font-size:clamp(34px,9vw,44px);
+    line-height:1.08;
+    letter-spacing:.01em;
+  }
+  .date{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:18px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .divider{
+    width:44px;height:1px;background:var(--stone);
+    margin:26px auto;
+  }
+  /* ---- the sculpture-player ---- */
+  .player{
+    position:relative;
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
+    outline-offset:6px;
+    border-radius:12px;
+  }
+  .player:focus-visible{outline:2px solid var(--bronze)}
+  .player svg{width:100%;height:auto;display:block}
+  .wave-base{fill:var(--stone)}
+  .wave-fill{fill:var(--bronze)}
+  #fillClipRect{transition:width .18s linear}
+  .playing .wave-fill{filter:drop-shadow(0 1px 6px rgba(154,123,79,.35))}
+  .hint{
+    margin-top:16px;
+    font-size:14px;
+    color:var(--ink-soft);
+  }
+  .hint b{color:var(--bronze-deep);font-weight:500}
+  .time{
+    display:flex;
+    justify-content:space-between;
+    font-variant-numeric:tabular-nums;
+    font-size:12px;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+    margin-top:10px;
+    padding:0 4px;
+    opacity:0;
+    transition:opacity .4s;
+  }
+  .started .time{opacity:1}
+  .foot{
+    margin-top:44px;
+    font-size:11px;
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--stone);
+  }
+  .err{
+    margin-top:14px;font-size:13px;color:#9c5a3c;display:none;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .playing .wave-base, .playing .wave-fill{
+      transform-origin:center;
+      animation:breathe 3.2s ease-in-out infinite;
+    }
+    @keyframes breathe{
+      0%,100%{transform:scaleY(1)}
+      50%{transform:scaleY(1.03)}
+    }
+  }
+</style>
+</head>
+<body>
+<main class="card">
+  <p class="eyebrow">Balss skulptūra</p>
+  <h1 id="title">Šeit būs vārds</h1>
+  <p class="date" id="date">2026. gada 23. augusts</p>
+
+  <div class="divider"></div>
+
+  <div class="player" id="player" role="button" tabindex="0"
+       aria-label="Atskaņot ierakstu">
+    <svg id="waveSvg" viewBox="0 0 460 160" aria-hidden="true">
+      <defs>
+        <clipPath id="fillClip"><rect id="fillClipRect" x="0" y="0" width="0" height="160"/></clipPath>
+      </defs>
+      <path class="wave-base" id="waveBase"></path>
+      <path class="wave-fill" id="waveFill" clip-path="url(#fillClip)"></path>
+    </svg>
+    <div class="time"><span id="tCur">0:00</span><span id="tDur">–:––</span></div>
+  </div>
+
+  <p class="hint" id="hint">Pieskaries vilnim, lai <b>klausītos</b></p>
+  <p class="err" id="err">Ierakstu neizdevās ielādēt. Pārbaudi interneta savienojumu un mēģini vēlreiz.</p>
+
+  <p class="foot">Tava balss · pārvērsta formā</p>
+</main>
+
+<audio id="audio" src="voice.mp3" preload="metadata"></audio>
+
+<script>
+/* ============ EDIT THESE ============ */
+const CONFIG = {
+  title: "Šeit būs vārds",          // recipient's name or message title
+  date:  "2026. gada 23. augusts",  // date shown under the name
+  audio: "voice.mp3"                // audio file in the same folder
+};
+/* ==================================== */
+
+document.getElementById('title').textContent = CONFIG.title;
+document.getElementById('date').textContent  = CONFIG.date;
+
+const audio = document.getElementById('audio');
+audio.src = CONFIG.audio;
+
+/* ---- draw the same lobed waveform as the physical sculpture ---- */
+(function drawWave(){
+  const W=460, H=160, mid=H/2, spine=3;
+  const ctrl=[[0,.13],[.05,.16],[.13,.42],[.195,.17],[.265,.52],[.33,.24],
+              [.415,1],[.5,.36],[.575,.92],[.655,.30],[.73,.56],[.8,.2],
+              [.87,.36],[.935,.16],[1,.13]];
+  // simple monotone interpolation of the envelope
+  function env(t){
+    for(let i=1;i<ctrl.length;i++){
+      if(t<=ctrl[i][0]){
+        const [x0,y0]=ctrl[i-1],[x1,y1]=ctrl[i];
+        const u=(t-x0)/(x1-x0), s=u*u*(3-2*u);   // smoothstep
+        return y0+(y1-y0)*s;
+      }
+    }
+    return ctrl[ctrl.length-1][1];
+  }
+  const P=W/13, RMAX=mid-6;
+  let top=[], n=460;
+  for(let i=0;i<=n;i++){
+    const x=i/n*W;
+    const rd=Math.max(spine, env(x/W)*RMAX);
+    const u=.5+.5*Math.cos(2*Math.PI*x/P);
+    top.push([x, mid - (spine+(rd-spine)*Math.pow(u,.8))]);
+  }
+  let d="M0,"+mid;
+  top.forEach(p=>d+="L"+p[0].toFixed(1)+","+p[1].toFixed(1));
+  for(let i=n;i>=0;i--){
+    const [x,y]=top[i];
+    d+="L"+x.toFixed(1)+","+(2*mid-y).toFixed(1);
+  }
+  d+="Z";
+  document.getElementById('waveBase').setAttribute('d',d);
+  document.getElementById('waveFill').setAttribute('d',d);
+})();
+
+/* ---- player logic ---- */
+const player=document.getElementById('player');
+const clipRect=document.getElementById('fillClipRect');
+const tCur=document.getElementById('tCur');
+const tDur=document.getElementById('tDur');
+const hint=document.getElementById('hint');
+const err=document.getElementById('err');
+
+const fmt=s=>{
+  if(!isFinite(s)) return "–:––";
+  s=Math.round(s);
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+};
+
+audio.addEventListener('loadedmetadata',()=>{ tDur.textContent=fmt(audio.duration); });
+audio.addEventListener('error',()=>{ err.style.display='block'; });
+
+function toggle(){
+  if(audio.paused){
+    audio.play().then(()=>{
+      player.classList.add('playing');
+      document.body.classList.add('started');
+      hint.textContent="Pieskaries vēlreiz, lai apturētu";
+    }).catch(()=>{ err.style.display='block'; });
+  }else{
+    audio.pause();
+    player.classList.remove('playing');
+    hint.innerHTML="Pieskaries vilnim, lai <b>turpinātu</b>";
+  }
+}
+player.addEventListener('click',toggle);
+player.addEventListener('keydown',e=>{
+  if(e.key===" "||e.key==="Enter"){e.preventDefault();toggle();}
+});
+
+audio.addEventListener('timeupdate',()=>{
+  tCur.textContent=fmt(audio.currentTime);
+  if(isFinite(audio.duration)){
+    clipRect.setAttribute('width', 460*audio.currentTime/audio.duration);
+  }
+});
+audio.addEventListener('ended',()=>{
+  player.classList.remove('playing');
+  clipRect.setAttribute('width',460);
+  hint.innerHTML="Pieskaries, lai <b>klausītos vēlreiz</b>";
+  setTimeout(()=>clipRect.setAttribute('width',0),1200);
+  audio.currentTime=0;
+});
+</script>
+</body>
+</html>
